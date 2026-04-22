@@ -278,10 +278,14 @@
 <div class="tarea" id="tarea"></div>
 
 <script>
-// Use corsproxy.io to bypass CORS — free, no signup needed
-const PROXY = "https://corsproxy.io/?url=";
-const NAPI  = "https://api.notion.com/v1";
-const NV    = "2022-06-28";
+// CORS proxies with fallback
+const PROXIES = [
+  "https://corsproxy.io/?url=",
+  "https://api.allorigins.win/raw?url=",
+];
+const NAPI = "https://api.notion.com/v1";
+const NV   = "2022-06-28";
+let proxyIdx = 0;
 const SS    = ['Production','QC Hold','Released','Shipped','Rejected'];
 const PC    = {'Flip-Off Caps 20mm':'FO','Silica Gel Capsules':'SC','Silica Gel Sachets':'SS'};
 const SC    = {'Production':'ap','QC Hold':'aq','Released':'ar','Shipped':'as','Rejected':'ax'};
@@ -311,13 +315,22 @@ function doSetup(){
 }
 
 async function api(method,path,body){
-  const url=PROXY+encodeURIComponent(NAPI+path);
-  const r=await fetch(url,{
-    method,
-    headers:{'Authorization':'Bearer '+TOKEN,'Notion-Version':NV,'Content-Type':'application/json'},
-    body:body?JSON.stringify(body):undefined
-  });
-  return r.json();
+  const fullUrl=NAPI+path;
+  let lastErr;
+  for(let i=0;i<PROXIES.length;i++){
+    const idx=(proxyIdx+i)%PROXIES.length;
+    try{
+      const url=PROXIES[idx]+encodeURIComponent(fullUrl);
+      const r=await fetch(url,{
+        method,
+        headers:{'Authorization':'Bearer '+TOKEN,'Notion-Version':NV,'Content-Type':'application/json'},
+        body:body?JSON.stringify(body):undefined
+      });
+      const data=await r.json();
+      if(data.object!=='error'||data.status!==0){proxyIdx=idx;return data;}
+    }catch(e){lastErr=e;}
+  }
+  throw lastErr||new Error('All proxies failed');
 }
 
 function parse(p){
@@ -345,7 +358,7 @@ async function load(){
       res.push(...(r.results||[]));more=r.has_more;cur=r.next_cursor;
     }
     BATCHES=res.map(parse).filter(b=>b.batchNo);
-    conn('ok');renderStats();renderList();
+    conn('ok');renderStats();renderList();populateBatchSelect();
   }catch(e){conn('err');toast('Connection failed: '+e.message,'err');}
 }
 
@@ -538,12 +551,9 @@ function toast(msg,type='info'){
 function init(){
   const d=new Date();document.getElementById('nm').valueAsDate=d;
   const ed=new Date();ed.setFullYear(ed.getFullYear()+2);document.getElementById('ne').valueAsDate=ed;
+  document.getElementById('blist').innerHTML='<div class="empty" style="color:var(--accent)">Loading your batches from Notion...</div>';
   prev();load();
 }
-
-// Also populate label batch select after load
-const _origLoad=load;
-async function load(){await _origLoad.call(this);setTimeout(populateBatchSelect,500);}
 
 
 // ── PRINT LABELS ──────────────────────────────────────────
