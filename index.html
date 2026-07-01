@@ -188,11 +188,6 @@
       <div class="shint">Starts with <code>ntn_</code> or <code>secret_</code></div>
     </div>
     <div class="sfield">
-      <label>Worker URL</label>
-      <input type="text" id="sw" placeholder="https://eps-notion-proxy.YOUR-NAME.workers.dev">
-      <div class="shint">Your Cloudflare Worker URL — see setup instructions below</div>
-    </div>
-    <div class="sfield">
       <label>Database ID</label>
       <input type="text" id="sd" value="6913c91399f44e6db06d93b14d712ebd">
       <div class="shint">Pre-filled with your EPS Batch Register</div>
@@ -201,16 +196,7 @@
       <button class="btn btn-primary" onclick="doSetup()">Connect</button>
       <span id="smsg" style="font-size:12px;color:var(--red-fg)"></span>
     </div>
-    <hr style="border:none;border-top:1px solid var(--border);margin:1.25rem 0">
-    <div style="font-size:12px;color:var(--text-mid)">
-      <strong style="display:block;margin-bottom:6px">How to get your Worker URL (free, 3 minutes):</strong>
-      <div style="line-height:1.8">
-        1. Go to <a href="https://workers.cloudflare.com" target="_blank">workers.cloudflare.com</a> → sign up free<br>
-        2. Click <strong>Create Worker</strong> → paste in the <code>worker.js</code> file<br>
-        3. Click <strong>Deploy</strong> → copy the URL shown (e.g. <code>your-worker.workers.dev</code>)<br>
-        4. Paste that URL above and click Connect
-      </div>
-    </div>
+
   </div>
 </div>
 
@@ -334,6 +320,12 @@
               <option value="">— none —</option>
             </select>
           </div>
+          <div id="line-wrap" style="display:none">
+            <label>Production Line</label>
+            <select id="nline">
+              <option value="">— select line —</option>
+            </select>
+          </div>
           <div><label>No. of cartons</label><input type="number" id="nc" value="4" min="1" max="500" oninput="prev()"></div>
           <div><label>Bags per carton</label><input type="number" id="nb" value="2" min="1" max="10" oninput="prev()"></div>
           <div><label>Pcs per bag</label><input type="number" id="npc" value="5000" min="1" oninput="prev()"></div>
@@ -385,9 +377,7 @@
 <div class="tarea" id="tarea"></div>
 
 <script>
-// Your Cloudflare Worker URL — set this after deploying the worker
-// Instructions: see the worker.js file included with this app
-let WORKER_URL = localStorage.getItem('eps_worker_url') || '';
+const PROXY = "http://localhost:5055/notion";
 const NAPI = "https://api.notion.com/v1";
 const NV   = "2022-06-28";
 const SS    = ['Production','QC Hold','Released','Shipped','Rejected'];
@@ -401,6 +391,10 @@ const SIZE_OPTIONS = {
   'Silica Gel Capsules': ['0.3g','0.5g','1g'],
   'Silica Gel Sachets': ['0.5g','1g','10g']
 };
+const LINE_OPTIONS = {
+  'Silica Gel Sachets': ['Line 1','Line 2'],
+  'Silica Gel Capsules': ['Line 1','Line 2','Line 3']
+};
 const SC    = {'Production':'ap','QC Hold':'aq','Released':'ar','Shipped':'as','Rejected':'ax'};
 let TOKEN='', DBID='6913c91399f44e6db06d93b14d712ebd', BATCHES=[], ORDERS=[];
 
@@ -409,39 +403,30 @@ function pad(n,l){return String(n).padStart(l,'0')}
 function loadCfg(){
   TOKEN=localStorage.getItem('eps_t')||'';
   DBID=localStorage.getItem('eps_d')||DBID;
-  WORKER_URL=localStorage.getItem('eps_worker_url')||'';
   document.getElementById('st').value=TOKEN;
   document.getElementById('sd').value=DBID;
-  if(document.getElementById('sw'))document.getElementById('sw').value=WORKER_URL;
-  if(TOKEN&&WORKER_URL){document.getElementById('sov').style.display='none';init();}
+  if(TOKEN){document.getElementById('sov').style.display='none';init();}
 }
 
 function doSetup(){
   const t=document.getElementById('st').value.trim();
-  const w=document.getElementById('sw').value.trim().replace(/\/$/,'');
   const d=document.getElementById('sd').value.trim().replace(/-/g,'');
   if(!t||(!t.startsWith('ntn_')&&!t.startsWith('secret_'))){
     document.getElementById('smsg').textContent='Token must start with ntn_ or secret_';return;
   }
-  if(!w||!w.startsWith('http')){
-    document.getElementById('smsg').textContent='Please enter your Worker URL';return;
-  }
   if(d.length!==32){document.getElementById('smsg').textContent='Database ID must be 32 chars';return;}
-  TOKEN=t;DBID=d;WORKER_URL=w;
-  localStorage.setItem('eps_t',t);localStorage.setItem('eps_d',d);localStorage.setItem('eps_worker_url',w);
+  TOKEN=t;DBID=d;
+  localStorage.setItem('eps_t',t);localStorage.setItem('eps_d',d);
   document.getElementById('sov').style.display='none';
   init();
 }
 
 async function api(method,path,body){
-  if(!WORKER_URL) throw new Error('NO_WORKER');
-  const url = WORKER_URL.replace(/\/$/, '') + '/notion' + path;
-  const r = await fetch(url, {
+  const r = await fetch(PROXY + path, {
     method,
-    headers: {
-      'Authorization': 'Bearer ' + TOKEN,
-      'Notion-Version': NV,
-      'Content-Type': 'application/json'
+    headers:{
+      'Content-Type':'application/json',
+      'X-Notion-Token': TOKEN
     },
     body: body ? JSON.stringify(body) : undefined
   });
@@ -456,7 +441,7 @@ function parse(p){
   const d=k=>pr[k]?.date?.start||'';
   return{id:p.id,batchNo:t('Batch No.'),product:s('Product'),productCode:s('Product Code'),
     status:s('Status'),color:t('Cap Colour'),size:s('Size'),
-    orderNo:t('Order No.'),orderStart:d('Order Start Date'),deliveryDate:d('Delivery Date'),
+    orderNo:t('Order No.'),orderStart:d('Order Start Date'),deliveryDate:d('Delivery Date'),line:s('Line'),
     mfg:d('Mfg. Date'),expiry:d('Expiry Date'),cartons:n('No. of Cartons'),
     bagsPerCarton:n('Bags per Carton'),pcsPerBag:n('Pcs per Bag'),
     totalPieces:pr['Total Pieces']?.formula?.number||0,
@@ -481,9 +466,7 @@ async function load(){
     BATCHES=all.filter(x=>x.recordType!=='Order');
     conn('ok');renderStats();renderList();populateBatchSelect();
     renderOrderStats();renderOrders();populateOrderSelect();refreshOrderNo();
-  }catch(e){conn('err');
-    if(e.message==='NO_WORKER'){toast('Worker URL not set — open Settings','err');}
-    else{toast('Connection failed: '+e.message,'err');}}
+  }catch(e){conn('err');toast('Cannot reach server. Is start.command running?','err');}
 }
 
 function conn(s,m=''){
@@ -515,7 +498,7 @@ function renderList(){
       <div class="bmain">
         <span class="bno">${b.batchNo}</span>
         <span class="badge b-${sc}">${b.status}</span>
-        <span class="bmeta">${b.product}${b.size?' — '+b.size:(b.color?' — '+b.color:'')}</span>
+        <span class="bmeta">${b.product}${b.size?' — '+b.size:(b.color?' — '+b.color:'')}${b.line?' · '+b.line:''}</span>
         <span class="bmeta">${b.cartons} cartons · ${b.bagsPerCarton} bags · ${tot} pcs</span>
         ${b.orderNo?`<span class="bmeta" style="font-family:var(--font-mono);font-size:11px">${b.orderNo}</span>`:''}
         ${b.client?`<span class="bmeta">${b.client}</span>`:''}
@@ -550,8 +533,16 @@ function renderList(){
             <input type="text" id="colinput-${b.id}" value="${b.color||''}" placeholder="e.g. Blue, Brown..." style="font-size:12px;padding:5px 9px;flex:1;max-width:160px">
             <button class="btn btn-sm" onclick="updVariant('${b.id}','${b.batchNo}')">Save</button>
           </div>`}
+          ${LINE_OPTIONS[b.product]?`<div class="elbl" style="margin-top:10px">Production line</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="linesel-${b.id}" style="font-size:12px;padding:5px 9px;flex:1;max-width:160px">
+              <option value="">— none —</option>
+              ${(LINE_OPTIONS[b.product]||[]).map(l=>`<option${b.line===l?' selected':''}>${l}</option>`).join('')}
+            </select>
+            <button class="btn btn-sm" onclick="updLine('${b.id}','${b.batchNo}')">Save</button>
+          </div>`:''}
           ${b.notes?`<div style="margin-top:10px;font-size:12px;color:var(--text-mid)">${b.notes}</div>`:''}
-          <div style="margin-top:8px;font-size:11px;color:var(--text-light)">Mfg: ${b.mfg||'—'} · Exp: ${b.expiry||'—'}${b.size?' · Size: '+b.size:(b.color?' · Colour: '+b.color:'')}</div>
+          <div style="margin-top:8px;font-size:11px;color:var(--text-light)">Mfg: ${b.mfg||'—'} · Exp: ${b.expiry||'—'}${b.size?' · Size: '+b.size:(b.color?' · Colour: '+b.color:'')}${b.line?' · '+b.line:''}</div>
           ${b.orderNo||b.orderStart||b.deliveryDate?`<div style="margin-top:6px;font-size:11px;color:var(--text-mid);background:var(--surface);padding:6px 8px;border-radius:6px;border:0.5px solid var(--border)">
             ${b.orderNo?`<span style="font-family:var(--font-mono)">${b.orderNo}</span> · `:''}
             ${b.orderStart?`Start: ${b.orderStart}`:''}
@@ -617,6 +608,18 @@ async function updStatus(pid,ns,bn){
   }catch(e){toast('Error: '+e.message,'err');}
 }
 
+async function updLine(pid,bn){
+  const sel=document.getElementById('linesel-'+pid);
+  const val=sel?sel.value:'';
+  toast(`Updating ${bn} line...`,'info');
+  try{
+    const r=await api('PATCH',`/pages/${pid}`,{properties:{'Line':{select:val?{name:val}:null}}});
+    if(r.object==='error'){toast('Error: '+r.message,'err');return;}
+    const b=BATCHES.find(x=>x.id===pid);if(b)b.line=val;
+    renderList();toast(`${bn} → ${val||'(cleared)'}`,'ok');
+  }catch(e){toast('Error: '+e.message,'err');}
+}
+
 async function updVariant(pid,bn){
   const b=BATCHES.find(x=>x.id===pid);
   const input=document.getElementById('colinput-'+pid);
@@ -637,8 +640,11 @@ async function updVariant(pid,bn){
 function toggleVariantField(){
   const prod=document.getElementById('np').value;
   const sizeOpts=SIZE_OPTIONS[prod];
+  const lineOpts=LINE_OPTIONS[prod];
   const colInput=document.getElementById('ncol');
   const sizeSel=document.getElementById('nsize');
+  const lineWrap=document.getElementById('line-wrap');
+  const lineSel=document.getElementById('nline');
   const lbl=document.getElementById('variant-label');
   if(sizeOpts){
     lbl.textContent='Size';
@@ -649,6 +655,13 @@ function toggleVariantField(){
     lbl.textContent='Cap Colour';
     colInput.style.display='block';
     sizeSel.style.display='none';
+  }
+  if(lineOpts){
+    lineWrap.style.display='block';
+    lineSel.innerHTML='<option value="">— select line —</option>'+lineOpts.map(l=>`<option>${l}</option>`).join('');
+  } else {
+    lineWrap.style.display='none';
+    lineSel.value='';
   }
 }
 
@@ -674,6 +687,7 @@ async function createBatch(){
   const bags=parseInt(document.getElementById('nb').value)||2;
   const pcs=parseInt(document.getElementById('npc').value)||5000;
 
+  const line=document.getElementById('nline')?document.getElementById('nline').value:'';
   const mfg=document.getElementById('nm').value;
   const exp=document.getElementById('ne').value;
   const status=document.getElementById('ns').value;
@@ -700,6 +714,7 @@ async function createBatch(){
     if(mfg)props['Mfg. Date']={date:{start:mfg}};
     if(exp)props['Expiry Date']={date:{start:exp}};
     if(client)props['Client / Destination']={rich_text:[{text:{content:client}}]};
+    if(line)props['Line']={select:{name:line}};
     if(notes)props['Notes']={rich_text:[{text:{content:notes}}]};
     const r=await api('POST','/pages',{parent:{database_id:DBID},properties:props});
     if(r.object==='error'){toast('Notion: '+r.message,'err');document.getElementById('savemsg').textContent='';btn.disabled=false;return;}
@@ -707,6 +722,7 @@ async function createBatch(){
     renderOrderStats();renderOrders();populateOrderSelect();
     document.getElementById('ncl').value='';document.getElementById('nn').value='';
     document.getElementById('ncol').value='';document.getElementById('nsize').value='';
+    if(document.getElementById('nline'))document.getElementById('nline').value='';
     document.getElementById('savemsg').textContent='';prev();
     toast(`${batchNo} saved!`,'ok');
     const variantTxt=isSize?(size?' — '+size:''):(color?' — '+color:'');
