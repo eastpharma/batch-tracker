@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EPS Batch Tracker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+  :root {
+    --navy:#0D2B4E; --navy-mid:#1A4F82; --accent:#2E86C1; --accent-light:#EBF5FB;
+    --green-bg:#D5F5E3; --green-fg:#1E8449;
+    --amber-bg:#FDEBD0; --amber-fg:#935116;
+    --red-bg:#FADBD8;   --red-fg:#922B21;
+    --blue-bg:#D6EAF8;  --blue-fg:#1A5276;
+    --border:#DDE1E6; --text:#1A1A2E; --text-mid:#5D6D7E; --text-light:#99A3AE;
+    --surface:#F8F9FB;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'IBM Plex Sans',system-ui,sans-serif;background:var(--surface);color:var(--text);min-height:100vh}
+
+  .header{background:var(--navy);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100}
+  .header-brand{display:flex;align-items:center;gap:12px}
+  .logo{width:32px;height:32px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:600;color:white;font-size:13px}
+  .htitle{color:white;font-size:15px;font-weight:500}
+  .hsub{color:rgba(255,255,255,.45);font-size:12px;margin-top:1px}
+  .nbadge{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:4px 12px;font-size:11px;color:rgba(255,255,255,.7)}
+  .dot{width:7px;height:7px;border-radius:50%;background:#2ECC71;flex-shrink:0}
+  .dot.off{background:#E74C3C}
+  .hright{display:flex;align-items:center;gap:10px}
+
+  .setup-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:2rem}
+  .setup-box{background:white;border-radius:14px;padding:2rem;max-width:500px;width:100%;max-height:90vh;overflow-y:auto}
+  .setup-box h2{font-size:20px;font-weight:500;margin-bottom:6px;color:var(--navy)}
+  .setup-box p{font-size:13px;color:var(--text-mid);line-height:1.6;margin-bottom:1rem}
+  .step{display:flex;gap:10px;font-size:12px;color:var(--text-mid);line-height:1.6;margin-bottom:8px;padding:9px 10px;background:var(--surface);border-radius:7px;border:1px solid var(--border)}
+  .snum{width:20px;height:20px;flex-shrink:0;background:var(--navy);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600}
+  code{font-family:'IBM Plex Mono',monospace;background:#EDF0F3;padding:1px 5px;border-radius:4px;font-size:11px}
+  .sfield{margin-bottom:14px}
+  .sfield label{display:block;font-size:11px;color:var(--text-mid);font-weight:500;margin-bottom:4px}
+  .sfield input{width:100%;font-family:'IBM Plex Mono',monospace;padding:8px 11px;border:1px solid var(--border);border-radius:7px;font-size:12px}
+  .shint{font-size:11px;color:var(--text-light);margin-top:4px;line-height:1.5}
+  hr{border:none;border-top:1px solid var(--border);margin:1.25rem 0}
+
+  .layout{display:flex;height:calc(100vh - 56px)}
+  .sidebar{width:200px;flex-shrink:0;background:white;border-right:1px solid var(--border);padding:1.25rem 0}
+  .ssec{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-light);padding:0 1.25rem;margin-bottom:6px}
+  .nitem{display:flex;align-items:center;gap:8px;padding:8px 1.25rem;font-size:13px;color:var(--text-mid);cursor:pointer;border:none;background:none;width:100%;text-align:left;font-family:inherit;text-decoration:none;transition:background .1s}
+  .nitem:hover{background:var(--surface)}
+  .nitem.active{background:var(--accent-light);color:var(--accent);font-weight:500}
+  .ndiv{border:none;border-top:1px solid var(--border);margin:10px 0}
+  .nic{width:16px;height:16px;opacity:.7;flex-shrink:0}
+  .main{flex:1;overflow-y:auto;padding:1.75rem 2rem}
+
+  .sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:1.5rem}
+  .sc{background:white;border:1px solid var(--border);border-radius:10px;padding:.9rem 1rem}
+  .sc.acc{border-top:3px solid var(--accent)}
+  .slbl{font-size:11px;color:var(--text-mid);margin-bottom:4px}
+  .sval{font-size:24px;font-weight:300;color:var(--navy);font-family:'IBM Plex Mono',monospace}
+
+  .tbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;gap:10px;flex-wrap:wrap}
+  .tleft{display:flex;gap:8px;flex-wrap:wrap}
+
+  select,input[type=text],input[type=number],input[type=date],textarea{font-family:'IBM Plex Sans',sans-serif;font-size:13px;color:var(--text);background:white;border:1px solid var(--border);border-radius:7px;padding:7px 11px;outline:none;transition:border-color .15s}
+  select:focus,input:focus,textarea:focus{border-color:var(--accent)}
+  label{font-size:11px;color:var(--text-mid);display:block;margin-bottom:4px;font-weight:500}
+
+  .btn{font-family:'IBM Plex Sans',sans-serif;font-size:13px;font-weight:500;padding:7px 15px;border-radius:7px;cursor:pointer;border:1px solid var(--border);background:white;color:var(--text);display:inline-flex;align-items:center;gap:6px;transition:.1s;white-space:nowrap;text-decoration:none}
+  .btn:hover{background:var(--surface)}
+  .btn:active{transform:scale(.98)}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+  .btn-primary{background:var(--navy);color:white;border-color:var(--navy)}
+  .btn-primary:hover{background:var(--navy-mid);border-color:var(--navy-mid)}
+  .btn-sm{padding:4px 10px;font-size:12px}
+  .btn-white{color:white;border-color:rgba(255,255,255,.25);background:transparent}
+  .btn-white:hover{background:rgba(255,255,255,.1)}
+  .btn-danger{color:var(--red-fg);border-color:#F1948A}
+  .btn-danger:hover{background:var(--red-bg)}
+
+  .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap}
+  .b-Production{background:var(--amber-bg);color:var(--amber-fg)}
+  .b-QC_Hold{background:var(--red-bg);color:var(--red-fg)}
+  .b-Released{background:var(--green-bg);color:var(--green-fg)}
+  .b-Shipped{background:var(--blue-bg);color:var(--blue-fg)}
+  .b-Rejected{background:var(--red-bg);color:var(--red-fg)}
+
+  .bcard{background:white;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden}
+  .bcard:hover{border-color:#BDC3C7}
+  .bmain{display:flex;align-items:center;gap:12px;padding:12px 14px;flex-wrap:wrap}
+  .bno{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:500;color:var(--navy);min-width:155px}
+  .bmeta{font-size:12px;color:var(--text-mid)}
+  .bact{margin-left:auto;display:flex;gap:6px;align-items:center;flex-shrink:0}
+  .epanel{border-top:1px solid var(--border);padding:14px;background:var(--surface)}
+  .erow{display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start}
+  .esec{min-width:200px}
+  .elbl{font-size:11px;font-weight:600;color:var(--text-mid);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+  .spills{display:flex;gap:5px;flex-wrap:wrap}
+  .spill{padding:4px 11px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:white;font-family:inherit;transition:.1s}
+  .spill:hover{border-color:#aab}
+  .spill.ap{background:var(--amber-bg);color:var(--amber-fg);border-color:var(--amber-fg)}
+  .spill.aq{background:var(--red-bg);color:var(--red-fg);border-color:var(--red-fg)}
+  .spill.ar{background:var(--green-bg);color:var(--green-fg);border-color:var(--green-fg)}
+  .spill.as{background:var(--blue-bg);color:var(--blue-fg);border-color:var(--blue-fg)}
+  .spill.ax{background:var(--red-bg);color:var(--red-fg);border-color:var(--red-fg)}
+  .spill.cc-on{background:var(--navy);color:#fff;border-color:var(--navy)}
+
+  .cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-top:8px}
+  .cbox{background:white;border:1px solid var(--border);border-radius:8px;padding:.65rem .75rem}
+  .ctitle{font-size:12px;font-weight:500;color:var(--navy);margin-bottom:2px}
+  .ccode{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-light);margin-bottom:6px}
+  .bagrow{display:flex;align-items:center;gap:6px;padding:4px 7px;background:var(--surface);border-radius:5px;margin-bottom:3px;border:1px solid var(--border)}
+  .bagcode{font-family:'IBM Plex Mono',monospace;font-size:10px;flex:1;color:var(--text)}
+  .bagqty{font-size:10px;color:var(--text-mid)}
+
+  .fcard{background:white;border:1px solid var(--border);border-radius:10px;padding:1.5rem;max-width:680px}
+  .fcard h3{font-size:15px;font-weight:500;margin-bottom:1.25rem}
+  .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px}
+  .fgrid input,.fgrid select{width:100%}
+  .prevbox{margin-top:1rem;padding:12px;background:var(--surface);border-radius:8px;border:1px solid var(--border)}
+  .prevlbl{font-size:11px;color:var(--text-mid);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+  .prevcode{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--navy)}
+  .prevdet{font-size:12px;color:var(--text-mid);margin-top:2px}
+
+  .lrow{display:flex;gap:8px;margin-bottom:1rem;max-width:580px}
+  .lrow input{flex:1}
+  .rcard{background:white;border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;max-width:480px}
+  .rrow{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px}
+  .rrow:last-child{border:none}
+  .rl{color:var(--text-mid);font-size:12px}
+  .rv{font-weight:500}
+
+  .tarea{position:fixed;bottom:20px;right:20px;display:flex;flex-direction:column;gap:8px;z-index:999}
+  .toast{padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;box-shadow:0 2px 12px rgba(0,0,0,.15);animation:si .2s ease;max-width:340px}
+  .tok{background:var(--green-bg);color:var(--green-fg);border:1px solid #A9DFBF}
+  .terr{background:var(--red-bg);color:var(--red-fg);border:1px solid #F1948A}
+  .tinfo{background:var(--blue-bg);color:var(--blue-fg);border:1px solid #85C1E9}
+  @keyframes si{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
+
+  .empty{text-align:center;padding:3rem 1rem;color:var(--text-mid);font-size:13px}
+  .ptitle{font-size:18px;font-weight:500;margin-bottom:1.25rem;color:var(--navy)}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* ── Orders ── */
+  .ocard{background:white;border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden}
+  .ocard:hover{border-color:#BDC3C7}
+  .omain{padding:14px 16px}
+  .otop{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+  .ono{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;color:var(--navy)}
+  .ometa{font-size:12px;color:var(--text-mid)}
+  .oact{margin-left:auto;display:flex;gap:6px;align-items:center;flex-shrink:0}
+  .pbar{height:10px;background:var(--border);border-radius:6px;overflow:hidden;margin:6px 0}
+  .pfill{height:100%;background:var(--accent);border-radius:6px;transition:width .3s}
+  .pfill.done{background:var(--green-fg)}
+  .pnums{display:flex;justify-content:space-between;font-size:12px;color:var(--text-mid);font-family:'IBM Plex Mono',monospace}
+  .pnums b{color:var(--navy);font-weight:600}
+  .premain{font-size:12px}
+  .premain.rem{color:var(--amber-fg)}
+  .premain.over{color:var(--red-fg)}
+  .premain.full{color:var(--green-fg)}
+  .obatches{border-top:1px solid var(--border);background:var(--surface);padding:10px 14px}
+  .obrow{display:flex;align-items:center;gap:10px;padding:6px 8px;background:white;border:1px solid var(--border);border-radius:6px;margin-bottom:5px;flex-wrap:wrap}
+  .obrow .bno{min-width:140px}
+  .obnone{font-size:12px;color:var(--text-light);padding:4px 0}
+  .opbreak{background:white;border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:8px}
+  .opbttl{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-light);margin-bottom:6px}
+  .opbrow{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:3px 0;border-bottom:1px dashed var(--border)}
+  .opbrow:last-child{border:none}
+  .opbname{color:var(--text)}
+  .opbval{font-family:'IBM Plex Mono',monospace;color:var(--navy);font-weight:500}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+</head>
+<body>
+
+<div class="setup-overlay" id="sov">
+  <div class="setup-box">
+    <h2>EPS Batch Tracker</h2>
+    <p>Enter your Notion integration token once — it's saved in your browser forever after that.</p>
+
+    <div class="step"><div class="snum">1</div><div>Go to <a href="https://www.notion.so/profile/integrations" target="_blank">notion.so/profile/integrations</a> → click your <strong>barcodes</strong> integration → copy the token</div></div>
+    <div class="step"><div class="snum">2</div><div>Make sure you connected it to <strong>EPS Batch Register</strong> in Notion (via the Content access tab or the database ... menu)</div></div>
+    <div class="step"><div class="snum">3</div><div>Paste the token below and click Connect</div></div>
+
+    <hr>
+    <div class="sfield">
+      <label>Notion Token</label>
+      <input type="password" id="st" placeholder="ntn_xxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+      <div class="shint">Starts with <code>ntn_</code> or <code>secret_</code></div>
+    </div>
+    <div class="sfield">
+      <label>Database ID</label>
+      <input type="text" id="sd" value="6913c91399f44e6db06d93b14d712ebd">
+      <div class="shint">Pre-filled with your EPS Batch Register</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:1rem">
+      <button class="btn btn-primary" onclick="doSetup()">Connect</button>
+      <span id="smsg" style="font-size:12px;color:var(--red-fg)"></span>
+    </div>
+  </div>
+</div>
+
+<div class="header">
+  <div class="header-brand">
+    <div class="logo">EPS</div>
+    <div><div class="htitle">Batch Tracker</div><div class="hsub">East Pharmaceutical Services</div></div>
+  </div>
+  <div class="hright">
+    <div class="nbadge"><div class="dot off" id="cdot"></div><span id="clbl">Not connected</span></div>
+    <button class="btn btn-white btn-sm" onclick="document.getElementById('sov').style.display='flex'">Settings</button>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="ssec" style="margin-top:.25rem">Navigation</div>
+    <button class="nitem active" onclick="goPage('orders',this)">
+      <svg class="nic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><line x1="2" y1="6" x2="14" y2="6"/><line x1="5" y1="9" x2="11" y2="9"/><line x1="5" y1="11" x2="9" y2="11"/></svg>Orders
+    </button>
+    <button class="nitem" onclick="goPage('neworder',this)">
+      <svg class="nic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><line x1="8" y1="6.5" x2="8" y2="10.5"/><line x1="6" y1="8.5" x2="10" y2="8.5"/></svg>New order
+    </button>
+    <div class="ndiv"></div>
+    <button class="nitem" onclick="goPage('batches',this)">
+      <svg class="nic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>Batches
+    </button>
+    <button class="nitem" onclick="goPage('new',this)">
+      <svg class="nic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><line x1="8" y1="5" x2="8" y2="11"/><line x1="5" y1="8" x2="11" y2="8"/></svg>New batch
+    </button>
+    <button class="nitem" onclick="goPage('lookup',this)">
+      <svg class="nic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/></svg>Serial lookup
+    </button>
+    <button class="nitem" onclick="goPage('labels',this)">
+      <svg class="nic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="14" height="8" rx="1.5"/><line x1="4" y1="7" x2="12" y2="7"/><line x1="4" y1="9.5" x2="9" y2="9.5"/></svg>Print labels
+    </button>
+    <div class="ndiv"></div>
+    <div class="ssec">Notion</div>
+    <a class="nitem" href="https://www.notion.so/6913c91399f44e6db06d93b14d712ebd" target="_blank">
+      <svg class="nic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h10v10H3z"/><path d="M3 6h10M6 3v10"/></svg>Open in Notion
+    </a>
+    <button class="nitem" onclick="load()">
+      <svg class="nic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5"/><path d="M13.5 2.5v3.5H10"/></svg>Refresh
+    </button>
+  </div>
+
+  <div class="main">
+    <div id="page-orders">
+      <div class="ptitle">Orders</div>
+      <div class="sgrid" id="ostats"></div>
+      <div class="tbar">
+        <div class="tleft">
+          <input type="text" id="ofc" oninput="renderOrders()" placeholder="Filter by order no. / client..." style="width:220px">
+          <select id="ofs" onchange="renderOrders()"><option value="">All statuses</option><option>Production</option><option>QC Hold</option><option>Released</option><option>Shipped</option><option>Rejected</option></select>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="goPage('neworder',document.querySelectorAll('.nitem')[1])">+ New order</button>
+      </div>
+      <div id="olist"><div class="empty">Loading from Notion...</div></div>
+    </div>
+
+    <div id="page-neworder" style="display:none">
+      <div class="ptitle">Create New Order</div>
+      <div class="fcard">
+        <h3>Order details</h3>
+        <div class="fgrid">
+          <div><label>Order No. (auto)</label><input type="text" id="ono" readonly style="background:var(--surface);color:var(--navy);font-family:var(--font-mono);font-weight:500;cursor:default"></div>
+          <div><label>Client / Destination</label><input type="text" id="ocl" placeholder="e.g. Pharco Corp"></div>
+        </div>
+        <div class="fgrid">
+          <div><label>Order Start Date</label><input type="date" id="odt"></div>
+          <div><label>Delivery Date</label><input type="date" id="odelivery"></div>
+          <div><label>Product (optional)</label><select id="op" onchange="prevOrder()"><option value="">— any / mixed —</option><option>Flip-Off Caps 20mm</option><option>Silica Gel Capsules</option><option>Silica Gel Sachets</option></select></div>
+          <div><label>Target quantity (pcs)</label><input type="number" id="otq" value="1000000" min="1" oninput="prevOrder()"></div>
+          <div><label>Status</label><select id="os"><option>Production</option><option>QC Hold</option><option>Released</option><option>Shipped</option></select></div>
+        </div>
+        <div><label>Notes</label><textarea id="onn" style="width:100%;min-height:52px" placeholder="Optional — PO reference, delivery terms..."></textarea></div>
+        <div class="prevbox">
+          <div class="prevlbl">Order preview</div>
+          <div class="prevcode" id="opcode">EPS-ORD-260001</div>
+          <div class="prevdet" id="opdet">Target 1,000,000 pcs · fill with batches over time</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:1rem">
+          <button class="btn btn-primary" id="osavebtn" onclick="createOrder()">Save order to Notion</button>
+          <span id="osavemsg" style="font-size:12px;color:var(--text-mid)"></span>
+        </div>
+      </div>
+      <div id="newores" style="margin-top:1rem"></div>
+    </div>
+
+    <div id="page-batches" style="display:none">
+      <div class="ptitle">Batch Register</div>
+      <div class="sgrid" id="stats"></div>
+      <div class="tbar">
+        <div class="tleft">
+          <select id="fp" onchange="renderList()"><option value="">All products</option><option>Flip-Off Caps 20mm</option><option>Silica Gel Capsules</option><option>Silica Gel Sachets</option></select>
+          <input type="text" id="fc" oninput="renderList()" placeholder="Filter by colour/size..." style="width:160px">
+          <select id="fs" onchange="renderList()"><option value="">All statuses</option><option>Production</option><option>QC Hold</option><option>Released</option><option>Shipped</option><option>Rejected</option></select>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="goPage('new',document.querySelectorAll('.nitem')[3])">+ New batch</button>
+      </div>
+      <div id="blist"><div class="empty">Loading from Notion...</div></div>
+    </div>
+
+    <div id="page-new" style="display:none">
+      <div class="ptitle">Create New Batch</div>
+      <div class="fcard">
+        <h3>Batch details</h3>
+        <div id="nord-wrap" class="fgrid" style="margin-bottom:14px">
+          <div style="grid-column:1/-1">
+            <label>Part of order (optional)</label>
+            <select id="nord" onchange="onOrderPick()" style="width:100%"><option value="">— Standalone batch (no order) —</option></select>
+            <div id="nord-info" style="font-size:11px;color:var(--text-mid);margin-top:4px"></div>
+          </div>
+        </div>
+        <div class="fgrid">
+          <div><label>Product</label><select id="np" onchange="prev();toggleVariantField()"><option>Flip-Off Caps 20mm</option><option>Silica Gel Capsules</option><option>Silica Gel Sachets</option></select></div>
+          <div id="variant-wrap">
+            <label id="variant-label">Cap Colour</label>
+            <input type="text" id="ncol" placeholder="e.g. Blue, Brown, Dark Green...">
+            <select id="nsize" style="display:none">
+              <option value="">— none —</option>
+            </select>
+          </div>
+          <div><label>No. of cartons</label><input type="number" id="nc" value="4" min="1" max="500" oninput="prev()"></div>
+          <div><label>Bags per carton</label><input type="number" id="nb" value="2" min="1" max="10" oninput="prev()"></div>
+          <div><label>Pcs per bag</label><input type="number" id="npc" value="5000" min="1" oninput="prev()"></div>
+        </div>
+        <div class="fgrid">
+          <div><label>Mfg. date</label><input type="date" id="nm"></div>
+          <div><label>Expiry date</label><input type="date" id="ne"></div>
+          <div><label>Status</label><select id="ns"><option>Production</option><option>QC Hold</option><option>Released</option><option>Shipped</option></select></div>
+          <div><label>Client</label><input type="text" id="ncl" placeholder="e.g. Pharco Corp"></div>
+        </div>
+        <div><label>Notes</label><textarea id="nn" style="width:100%;min-height:52px" placeholder="Optional..."></textarea></div>
+        <div class="prevbox">
+          <div class="prevlbl">Batch code preview</div>
+          <div class="prevcode" id="pcode">EPS-FO-260001</div>
+          <div class="prevdet" id="pdet">4 cartons · 2 bags · 40,000 pcs total</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:1rem">
+          <button class="btn btn-primary" id="savebtn" onclick="createBatch()">Save to Notion</button>
+          <span id="savemsg" style="font-size:12px;color:var(--text-mid)"></span>
+        </div>
+      </div>
+      <div id="newres" style="margin-top:1rem"></div>
+    </div>
+
+    <div id="page-lookup" style="display:none">
+      <div class="ptitle">Serial Lookup</div>
+      <div class="lrow"><input type="text" id="lq" placeholder="Enter batch, carton or bag code — e.g. EPS-FO-260001-C02-B01" oninput="doLookup()"></div>
+      <div id="lres"></div>
+    </div>
+    <div id="page-labels" style="display:none">
+      <div class="ptitle">Print Labels</div>
+      <div class="fcard" style="margin-bottom:1rem">
+        <h3>Label settings</h3>
+        <div class="fgrid">
+          <div><label>Select batch</label><select id="lb-batch" onchange="previewLabels()"><option value="">— choose a batch —</option></select></div>
+          <div><label>Label type</label><select id="lb-type" onchange="previewLabels()"><option value="bag">Bag labels (one per bag)</option><option value="carton">Carton labels (one per carton)</option><option value="batch">Single batch label</option></select></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-mid);margin-bottom:.5rem">Carton labels print 5 per page · Bag labels print 7 per page · Black &amp; white, zero waste</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:.5rem">
+          <button class="btn btn-primary" onclick="printLabels()">Open Labels (Print or Download PDF)</button>
+          <span style="font-size:12px;color:var(--text-mid)" id="lb-count"></span>
+        </div>
+      </div>
+      <div id="lb-preview"></div>
+    </div>
+  </div>
+</div>
+
+<div class="tarea" id="tarea"></div>
+
+<script>
+// CORS proxies with fallback
+const PROXIES = [
+  "https://corsproxy.io/?url=",
+  "https://api.allorigins.win/raw?url=",
+];
+const NAPI = "https://api.notion.com/v1";
+const NV   = "2022-06-28";
+let proxyIdx = 0;
+const SS    = ['Production','QC Hold','Released','Shipped','Rejected'];
+const PC    = {'Flip-Off Caps 20mm':'FO','Silica Gel Capsules':'SC','Silica Gel Sachets':'SS'};
+function genOrderNo(batches){
+  const yr=new Date().getFullYear()%100;
+  const seq=(batches.filter(b=>b.orderNo&&b.orderNo.startsWith('EPS-ORD-'+pad(yr,2))).length+1);
+  return 'EPS-ORD-'+pad(yr,2)+pad(seq,4);
+}
+const SIZE_OPTIONS = {
+  'Silica Gel Capsules': ['0.3g','0.5g','1g'],
+  'Silica Gel Sachets': ['0.5g','1g','10g']
+};
+const SC    = {'Production':'ap','QC Hold':'aq','Released':'ar','Shipped':'as','Rejected':'ax'};
+let TOKEN='', DBID='6913c91399f44e6db06d93b14d712ebd', BATCHES=[], ORDERS=[];
+
+function pad(n,l){return String(n).padStart(l,'0')}
+
+function loadCfg(){
+  TOKEN=localStorage.getItem('eps_t')||'';
+  DBID=localStorage.getItem('eps_d')||DBID;
+  document.getElementById('st').value=TOKEN;
+  document.getElementById('sd').value=DBID;
+  if(TOKEN){document.getElementById('sov').style.display='none';init();}
+}
+
+function doSetup(){
+  const t=document.getElementById('st').value.trim();
+  const d=document.getElementById('sd').value.trim().replace(/-/g,'');
+  if(!t||(!t.startsWith('ntn_')&&!t.startsWith('secret_'))){
+    document.getElementById('smsg').textContent='Token must start with ntn_ or secret_';return;
+  }
+  if(d.length!==32){document.getElementById('smsg').textContent='Database ID must be 32 chars';return;}
+  TOKEN=t;DBID=d;
+  localStorage.setItem('eps_t',t);localStorage.setItem('eps_d',d);
+  document.getElementById('sov').style.display='none';
+  init();
+}
+
+async function api(method,path,body){
+  const fullUrl=NAPI+path;
+  let lastErr;
+  for(let i=0;i<PROXIES.length;i++){
+    const idx=(proxyIdx+i)%PROXIES.length;
+    try{
+      const url=PROXIES[idx]+encodeURIComponent(fullUrl);
+      const r=await fetch(url,{
+        method,
+        headers:{'Authorization':'Bearer '+TOKEN,'Notion-Version':NV,'Content-Type':'application/json'},
+        body:body?JSON.stringify(body):undefined
+      });
+      const data=await r.json();
+      if(data.object!=='error'||data.status!==0){proxyIdx=idx;return data;}
+    }catch(e){lastErr=e;}
+  }
+  throw lastErr||new Error('All proxies failed');
+}
+
+function parse(p){
+  const pr=p.properties||{};
+  const t=k=>pr[k]?.title?.[0]?.plain_text||pr[k]?.rich_text?.[0]?.plain_text||'';
+  const s=k=>pr[k]?.select?.name||'';
+  const n=k=>pr[k]?.number??0;
+  const d=k=>pr[k]?.date?.start||'';
+  return{id:p.id,batchNo:t('Batch No.'),product:s('Product'),productCode:s('Product Code'),
+    status:s('Status'),color:t('Cap Colour'),size:s('Size'),
+    orderNo:t('Order No.'),orderStart:d('Order Start Date'),deliveryDate:d('Delivery Date'),
+    mfg:d('Mfg. Date'),expiry:d('Expiry Date'),cartons:n('No. of Cartons'),
+    bagsPerCarton:n('Bags per Carton'),pcsPerBag:n('Pcs per Bag'),
+    totalPieces:pr['Total Pieces']?.formula?.number||0,
+    recordType:s('Record Type'),orderNo:t('Order No.'),targetQty:n('Target Qty'),
+    createdTime:p.created_time||'',
+    client:t('Client / Destination'),notes:t('Notes'),pageUrl:p.url,_exp:false};
+}
+
+async function load(){
+  conn('loading');
+  try{
+    let res=[],cur,more=true;
+    while(more){
+      const b={page_size:100,sorts:[{timestamp:'created_time',direction:'descending'}]};
+      if(cur)b.start_cursor=cur;
+      const r=await api('POST',`/databases/${DBID}/query`,b);
+      if(r.object==='error'){conn('err',r.message);toast('Notion error: '+r.message,'err');return;}
+      res.push(...(r.results||[]));more=r.has_more;cur=r.next_cursor;
+    }
+    const all=res.map(parse).filter(b=>b.batchNo);
+    ORDERS=all.filter(x=>x.recordType==='Order');
+    BATCHES=all.filter(x=>x.recordType!=='Order');
+    conn('ok');renderStats();renderList();populateBatchSelect();
+    renderOrderStats();renderOrders();populateOrderSelect();refreshOrderNo();
+  }catch(e){conn('err');toast('Connection failed: '+e.message,'err');}
+}
+
+function conn(s,m=''){
+  const dot=document.getElementById('cdot'),lbl=document.getElementById('clbl');
+  if(s==='ok'){dot.className='dot';lbl.textContent='Connected to Notion';}
+  else if(s==='loading'){dot.className='dot off';lbl.textContent='Loading...';}
+  else{dot.className='dot off';lbl.textContent=m||'Not connected';}
+}
+
+function renderStats(){
+  const s={total:BATCHES.length};
+  SS.forEach(x=>s[x]=0);
+  BATCHES.forEach(b=>{s[b.status]=(s[b.status]||0)+1;});
+  const pcs=BATCHES.reduce((a,b)=>a+(b.totalPieces||b.cartons*b.bagsPerCarton*b.pcsPerBag),0);
+  document.getElementById('stats').innerHTML=
+    `<div class="sc acc"><div class="slbl">Total batches</div><div class="sval">${s.total}</div></div>`+
+    SS.map(x=>`<div class="sc"><div class="slbl">${x}</div><div class="sval">${s[x]||0}</div></div>`).join('')+
+    `<div class="sc"><div class="slbl">Total pieces</div><div class="sval">${pcs.toLocaleString()}</div></div>`;
+}
+
+function renderList(){
+  const fp=document.getElementById('fp').value,fs=document.getElementById('fs').value,fc=document.getElementById('fc').value.trim().toLowerCase();
+  const list=BATCHES.filter(b=>(!fp||b.product===fp)&&(!fs||b.status===fs)&&(!fc||(b.color||'').toLowerCase().includes(fc)||(b.size||'').toLowerCase().includes(fc)));
+  if(!list.length){document.getElementById('blist').innerHTML=`<div class="empty">${BATCHES.length===0?'No batches yet. Create one from "New batch".':'No batches match this filter.'}</div>`;return;}
+  document.getElementById('blist').innerHTML=list.map(b=>{
+    const sc=b.status.replace(/\s/g,'_');
+    const tot=(b.totalPieces||b.cartons*b.bagsPerCarton*b.pcsPerBag).toLocaleString();
+    return`<div class="bcard">
+      <div class="bmain">
+        <span class="bno">${b.batchNo}</span>
+        <span class="badge b-${sc}">${b.status}</span>
+        <span class="bmeta">${b.product}${b.size?' — '+b.size:(b.color?' — '+b.color:'')}</span>
+        <span class="bmeta">${b.cartons} cartons · ${b.bagsPerCarton} bags · ${tot} pcs</span>
+        ${b.orderNo?`<span class="bmeta" style="font-family:var(--font-mono);font-size:11px">${b.orderNo}</span>`:''}
+        ${b.client?`<span class="bmeta">${b.client}</span>`:''}
+        ${b.deliveryDate?`<span class="bmeta" style="color:var(--amber-fg)">📦 Deliver by: ${b.deliveryDate}</span>`:''}
+        <div class="bact">
+          <a href="${b.pageUrl}" target="_blank" class="btn btn-sm">Notion ↗</a>
+          <button class="btn btn-sm" onclick="toggleExp('${b.id}')">${b._exp?'▲':'▼'} Details</button>
+          ${b._confirmDel?
+            `<button class="btn btn-sm btn-danger" onclick="deleteBatch('${b.id}','${b.batchNo}')">Confirm delete?</button>
+             <button class="btn btn-sm" onclick="cancelDel('${b.id}')">Cancel</button>`
+            :`<button class="btn btn-sm btn-danger" onclick="askDel('${b.id}')">Delete</button>`}
+        </div>
+      </div>
+      ${b._exp?`<div class="epanel"><div class="erow">
+        <div class="esec">
+          <div class="elbl">Update status</div>
+          <div class="spills">${SS.map(x=>{
+            const ac=SC[x];const cur=b.status===x;
+            return`<button class="spill${cur?' '+ac:''}" onclick="updStatus('${b.id}','${x}','${b.batchNo}')">${x}</button>`;
+          }).join('')}</div>
+          ${SIZE_OPTIONS[b.product]?`
+          <div class="elbl" style="margin-top:10px">Size</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="colinput-${b.id}" style="font-size:12px;padding:5px 9px;flex:1;max-width:160px">
+              <option value="">— none —</option>
+              ${SIZE_OPTIONS[b.product].map(s=>`<option${b.size===s?' selected':''}>${s}</option>`).join('')}
+            </select>
+            <button class="btn btn-sm" onclick="updVariant('${b.id}','${b.batchNo}')">Save</button>
+          </div>`:`
+          <div class="elbl" style="margin-top:10px">Cap colour</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="text" id="colinput-${b.id}" value="${b.color||''}" placeholder="e.g. Blue, Brown..." style="font-size:12px;padding:5px 9px;flex:1;max-width:160px">
+            <button class="btn btn-sm" onclick="updVariant('${b.id}','${b.batchNo}')">Save</button>
+          </div>`}
+          ${b.notes?`<div style="margin-top:10px;font-size:12px;color:var(--text-mid)">${b.notes}</div>`:''}
+          <div style="margin-top:8px;font-size:11px;color:var(--text-light)">Mfg: ${b.mfg||'—'} · Exp: ${b.expiry||'—'}${b.size?' · Size: '+b.size:(b.color?' · Colour: '+b.color:'')}</div>
+          ${b.orderNo||b.orderStart||b.deliveryDate?`<div style="margin-top:6px;font-size:11px;color:var(--text-mid);background:var(--surface);padding:6px 8px;border-radius:6px;border:0.5px solid var(--border)">
+            ${b.orderNo?`<span style="font-family:var(--font-mono)">${b.orderNo}</span> · `:''}
+            ${b.orderStart?`Start: ${b.orderStart}`:''}
+            ${b.orderStart&&b.deliveryDate?' → ':''}
+            ${b.deliveryDate?`Deliver by: <strong>${b.deliveryDate}</strong>`:''}
+          </div>`:''}
+        </div>
+        <div class="esec" style="flex:1;min-width:280px">
+          <div class="elbl">Cartons &amp; bags (${b.cartons})</div>
+          <div class="cgrid">${mkCartons(b)}</div>
+        </div>
+      </div></div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function mkCartons(b){
+  let h='';const max=Math.min(parseInt(b.cartons)||0,16);
+  for(let c=1;c<=max;c++){
+    const cc=b.batchNo+'-C'+pad(c,2);let bags='';
+    for(let bg=1;bg<=parseInt(b.bagsPerCarton)||2;bg++)
+      bags+=`<div class="bagrow"><span class="bagcode">${cc}-B${pad(bg,2)}</span><span class="bagqty">${(parseInt(b.pcsPerBag)||5000).toLocaleString()} pcs</span></div>`;
+    h+=`<div class="cbox"><div class="ctitle">Carton ${pad(c,2)}</div><div class="ccode">${cc}</div>${bags}</div>`;
+  }
+  if(parseInt(b.cartons)>16)h+=`<div class="cbox" style="display:flex;align-items:center;justify-content:center;color:var(--text-mid);font-size:12px">+${parseInt(b.cartons)-16} more</div>`;
+  return h;
+}
+
+function toggleExp(id){const b=BATCHES.find(x=>x.id===id);if(b)b._exp=!b._exp;renderList();}
+
+function askDel(id){
+  BATCHES.forEach(b=>b._confirmDel=false); // close any other open confirms
+  const b=BATCHES.find(x=>x.id===id);
+  if(b)b._confirmDel=true;
+  renderList();
+}
+
+function cancelDel(id){
+  const b=BATCHES.find(x=>x.id===id);
+  if(b)b._confirmDel=false;
+  renderList();
+}
+
+async function deleteBatch(pid,bn){
+  toast(`Deleting ${bn}...`,'info');
+  try{
+    const r=await api('PATCH',`/pages/${pid}`,{archived:true});
+    if(r.object==='error'){toast('Error: '+r.message,'err');return;}
+    BATCHES=BATCHES.filter(x=>x.id!==pid);
+    renderStats();renderList();
+    if(typeof populateBatchSelect==='function')populateBatchSelect();
+    toast(`${bn} deleted`,'ok');
+  }catch(e){toast('Error: '+e.message,'err');}
+}
+
+async function updStatus(pid,ns,bn){
+  toast(`Updating ${bn}...`,'info');
+  try{
+    const r=await api('PATCH',`/pages/${pid}`,{properties:{Status:{select:{name:ns}}}});
+    if(r.object==='error'){toast('Error: '+r.message,'err');return;}
+    const b=BATCHES.find(x=>x.id===pid);if(b)b.status=ns;
+    renderStats();renderList();toast(`${bn} → ${ns}`,'ok');
+  }catch(e){toast('Error: '+e.message,'err');}
+}
+
+async function updVariant(pid,bn){
+  const b=BATCHES.find(x=>x.id===pid);
+  const input=document.getElementById('colinput-'+pid);
+  const val=(input?input.value:'').trim();
+  const isSize=b&&!!SIZE_OPTIONS[b.product];
+  toast(`Updating ${bn} ${isSize?'size':'colour'}...`,'info');
+  try{
+    const props=isSize
+      ? {'Size':{select:val?{name:val}:null}}
+      : {'Cap Colour':{rich_text:val?[{text:{content:val}}]:[]}};
+    const r=await api('PATCH',`/pages/${pid}`,{properties:props});
+    if(r.object==='error'){toast('Error: '+r.message,'err');return;}
+    if(b){ if(isSize)b.size=val; else b.color=val; }
+    renderList();toast(`${bn} ${isSize?'size':'colour'} → ${val||'(cleared)'}`,'ok');
+  }catch(e){toast('Error: '+e.message,'err');}
+}
+
+function toggleVariantField(){
+  const prod=document.getElementById('np').value;
+  const sizeOpts=SIZE_OPTIONS[prod];
+  const colInput=document.getElementById('ncol');
+  const sizeSel=document.getElementById('nsize');
+  const lbl=document.getElementById('variant-label');
+  if(sizeOpts){
+    lbl.textContent='Size';
+    colInput.style.display='none';
+    sizeSel.style.display='block';
+    sizeSel.innerHTML='<option value="">— none —</option>'+sizeOpts.map(s=>`<option>${s}</option>`).join('');
+  } else {
+    lbl.textContent='Cap Colour';
+    colInput.style.display='block';
+    sizeSel.style.display='none';
+  }
+}
+
+function prev(){
+  const prod=document.getElementById('np').value;
+  const pc=PC[prod]||'XX',yr=new Date().getFullYear()%100;
+  const seq=BATCHES.filter(b=>b.productCode===pc).length+1;
+  const bn=`EPS-${pc}-${pad(yr,2)}${pad(seq,4)}`;
+  const c=parseInt(document.getElementById('nc').value)||0;
+  const bg=parseInt(document.getElementById('nb').value)||0;
+  const p=parseInt(document.getElementById('npc').value)||0;
+  document.getElementById('pcode').textContent=bn;
+  document.getElementById('pdet').textContent=`${c} cartons · ${bg} bags · ${(c*bg*p).toLocaleString()} pcs total`;
+  document.getElementById('norderno').value=genOrderNo(BATCHES);
+}
+
+async function createBatch(){
+  const prod=document.getElementById('np').value;
+  const isSize=!!SIZE_OPTIONS[prod];
+  const color=isSize?'':document.getElementById('ncol').value;
+  const size=isSize?document.getElementById('nsize').value:'';
+  const cartons=parseInt(document.getElementById('nc').value)||1;
+  const bags=parseInt(document.getElementById('nb').value)||2;
+  const pcs=parseInt(document.getElementById('npc').value)||5000;
+
+  const mfg=document.getElementById('nm').value;
+  const exp=document.getElementById('ne').value;
+  const status=document.getElementById('ns').value;
+  const client=document.getElementById('ncl').value.trim();
+  const notes=document.getElementById('nn').value.trim();
+  const orderNo=genOrderNo(BATCHES);
+  const pc=PC[prod]||'XX',yr=new Date().getFullYear()%100;
+  const seq=BATCHES.filter(b=>b.productCode===pc).length+1;
+  const batchNo=`EPS-${pc}-${pad(yr,2)}${pad(seq,4)}`;
+  const btn=document.getElementById('savebtn');
+  btn.disabled=true;document.getElementById('savemsg').textContent='Saving...';
+  try{
+    const props={
+      'Batch No.':{title:[{text:{content:batchNo}}]},
+      'Product':{select:{name:prod}},'Product Code':{select:{name:pc}},
+      'Status':{select:{name:status}},'No. of Cartons':{number:cartons},
+      'Bags per Carton':{number:bags},'Pcs per Bag':{number:pcs},
+      'Record Type':{select:{name:'Batch'}},
+    };
+
+    if(color)props['Cap Colour']={rich_text:[{text:{content:color}}]};
+    if(size)props['Size']={select:{name:size}};
+
+    if(mfg)props['Mfg. Date']={date:{start:mfg}};
+    if(exp)props['Expiry Date']={date:{start:exp}};
+    if(client)props['Client / Destination']={rich_text:[{text:{content:client}}]};
+    if(notes)props['Notes']={rich_text:[{text:{content:notes}}]};
+    const r=await api('POST','/pages',{parent:{database_id:DBID},properties:props});
+    if(r.object==='error'){toast('Notion: '+r.message,'err');document.getElementById('savemsg').textContent='';btn.disabled=false;return;}
+    BATCHES.unshift(parse(r));renderStats();
+    renderOrderStats();renderOrders();populateOrderSelect();
+    document.getElementById('ncl').value='';document.getElementById('nn').value='';
+    document.getElementById('ncol').value='';document.getElementById('nsize').value='';
+    document.getElementById('savemsg').textContent='';prev();
+    toast(`${batchNo} saved!`,'ok');
+    const variantTxt=isSize?(size?' — '+size:''):(color?' — '+color:'');
+    document.getElementById('newres').innerHTML=`<div class="rcard">
+      <div style="font-size:14px;font-weight:500;margin-bottom:10px;color:var(--navy)">Batch created</div>
+      <div class="rrow"><span class="rl">Order no.</span><span class="rv" style="font-family:'IBM Plex Mono',monospace">${orderNo}</span></div>
+      <div class="rrow"><span class="rl">Batch no.</span><span class="rv" style="font-family:'IBM Plex Mono',monospace">${batchNo}</span></div>
+      <div class="rrow"><span class="rl">Product</span><span class="rv">${prod}${variantTxt}</span></div>
+      <div class="rrow"><span class="rl">Total pieces</span><span class="rv">${(cartons*bags*pcs).toLocaleString()}</span></div>
+      ${orderNo?(()=>{const o=ORDERS.find(x=>x.batchNo===orderNo);const rem=o?(o.targetQty||0)-orderFill(o):0;return`<div class="rrow"><span class="rl">Order</span><span class="rv" style="font-family:'IBM Plex Mono',monospace">${orderNo}</span></div><div class="rrow"><span class="rl">Order remaining</span><span class="rv">${rem>0?rem.toLocaleString()+' pcs':'target met'}</span></div>`;})():''}
+      <div class="rrow"><span class="rl">Status</span><span class="rv"><span class="badge b-${status.replace(/\s/g,'_')}">${status}</span></span></div>
+      <div class="rrow"><span class="rl">Notion</span><a href="${r.url||'#'}" target="_blank" class="rv">Open ↗</a></div>
+    </div>`;
+  }catch(e){toast('Error: '+e.message,'err');}
+  btn.disabled=false;
+}
+
+function doLookup(){
+  const q=document.getElementById('lq').value.trim().toUpperCase();
+  if(!q){document.getElementById('lres').innerHTML='';return;}
+  const ord=ORDERS.find(o=>o.batchNo.toUpperCase()===q);
+  if(ord){
+    const filled=orderFill(ord),target=ord.targetQty||0,rem=target-filled;
+    const sc=(ord.status||'Production').replace(/\s/g,'_');
+    const obs=orderBatches(ord);
+    const fields=[['Type','Order'],['Order no.',`<span style="font-family:'IBM Plex Mono',monospace">${ord.batchNo}</span>`],
+      ['Status',`<span class="badge b-${sc}">${ord.status||'Production'}</span>`],
+      ['Target',target.toLocaleString()+' pcs'],['Produced',filled.toLocaleString()+' pcs'],
+      ['Remaining',rem>0?rem.toLocaleString()+' pcs':'target met'],
+      ['Batches in order',String(obs.length)],
+      ...(ord.client?[['Client',ord.client]]:[]),
+      ['Notion',`<a href="${ord.pageUrl}" target="_blank">Open ↗</a>`]];
+    document.getElementById('lres').innerHTML=`<div class="rcard">${fields.map(([l,v])=>`<div class="rrow"><span class="rl">${l}</span><span class="rv">${v}</span></div>`).join('')}</div>`;
+    return;
+  }
+  let found=null,level='';
+  for(const b of BATCHES){
+    if(!b.batchNo)continue;
+    const bn=b.batchNo.toUpperCase();
+    if(bn===q){found=b;level='Batch';break;}
+    const c=parseInt(b.cartons)||0,bg=parseInt(b.bagsPerCarton)||2;
+    for(let ci=1;ci<=c;ci++){
+      const cc=bn+'-C'+pad(ci,2);
+      if(cc===q){found={...b,_carton:cc};level='Carton';break;}
+      for(let bi=1;bi<=bg;bi++){
+        const bc=cc+'-B'+pad(bi,2);
+        if(bc===q){found={...b,_carton:cc,_bag:bc};level='Bag';break;}
+      }
+      if(found)break;
+    }
+    if(found)break;
+  }
+  if(!found){document.getElementById('lres').innerHTML=`<div class="empty">No match for "${q}"</div>`;return;}
+  const sc=found.status.replace(/\s/g,'_');
+  const fields=[
+    ['Type',level],['Batch no.',`<span style="font-family:'IBM Plex Mono',monospace">${found.batchNo}</span>`],
+    ['Product',found.product],['Status',`<span class="badge b-${sc}">${found.status}</span>`],
+    ['Mfg.',found.mfg||'—'],['Expiry',found.expiry||'—'],
+    ...(found._carton?[['Carton',`<span style="font-family:'IBM Plex Mono',monospace">${found._carton}</span>`]]:[['Cartons',found.cartons]]),
+    ...(found._bag?[['Bag',`<span style="font-family:'IBM Plex Mono',monospace">${found._bag}</span>`]]:[['Total pcs',(found.totalPieces||found.cartons*found.bagsPerCarton*found.pcsPerBag).toLocaleString()]]),
+    ...(found.client?[['Client',found.client]]:[]),
+    ['Notion',`<a href="${found.pageUrl}" target="_blank">Open ↗</a>`],
+  ];
+  document.getElementById('lres').innerHTML=
+    `<div class="rcard">${fields.map(([l,v])=>`<div class="rrow"><span class="rl">${l}</span><span class="rv">${v}</span></div>`).join('')}</div>`;
+}
+
+function goPage(id,btn){
+  document.querySelectorAll('[id^="page-"]').forEach(p=>p.style.display='none');
+  document.getElementById('page-'+id).style.display='block';
+  document.querySelectorAll('.nitem').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+}
+
+function toast(msg,type='info'){
+  const el=document.createElement('div');
+  el.className=`toast t${type==='ok'?'ok':type==='err'?'err':'info'}`;
+  el.textContent=msg;
+  document.getElementById('tarea').appendChild(el);
+  setTimeout(()=>el.remove(),4000);
+}
+
+function init(){
+  const d=new Date();document.getElementById('nm').valueAsDate=d;
+  const ed=new Date();ed.setFullYear(ed.getFullYear()+2);document.getElementById('ne').valueAsDate=ed;
+  document.getElementById('odt').valueAsDate=d;
+  setTimeout(prevOrder,50);
+  document.getElementById('olist').innerHTML='<div class="empty" style="color:var(--accent)">Loading your orders from Notion...</div>';
+  document.getElementById('blist').innerHTML='<div class="empty" style="color:var(--accent)">Loading your batches from Notion...</div>';
+  toggleVariantField();
+  prev();prevOrder();load();
+}
+
+
+// ── ORDERS ────────────────────────────────────────────────
+function batchPcs(b){return b.totalPieces||(b.cartons*b.bagsPerCarton*b.pcsPerBag)||0;}
+function orderBatches(o){return BATCHES.filter(b=>b.orderNo&&b.orderNo===o.batchNo);}
+function orderFill(o){return orderBatches(o).reduce((a,b)=>a+batchPcs(b),0);}
+
+function nextOrderNo(){
+  const yr=new Date().getFullYear()%100;
+  const seq=ORDERS.length+1;
+  return `EPS-ORD-${pad(yr,2)}${pad(seq,4)}`;
+}
+function refreshOrderNo(){
+  const el=document.getElementById('ono');
+  if(el&&!el.value.trim())el.value=nextOrderNo();
+  prevOrder();
+}
+
+function renderOrderStats(){
+  const totalTarget=ORDERS.reduce((a,o)=>a+(o.targetQty||0),0);
+  const totalFilled=ORDERS.reduce((a,o)=>a+orderFill(o),0);
+  const open=ORDERS.filter(o=>orderFill(o)<(o.targetQty||0)).length;
+  document.getElementById('ostats').innerHTML=
+    `<div class="sc acc"><div class="slbl">Total orders</div><div class="sval">${ORDERS.length}</div></div>`+
+    `<div class="sc"><div class="slbl">Open</div><div class="sval">${open}</div></div>`+
+    `<div class="sc"><div class="slbl">Target pcs</div><div class="sval">${totalTarget.toLocaleString()}</div></div>`+
+    `<div class="sc"><div class="slbl">Produced pcs</div><div class="sval">${totalFilled.toLocaleString()}</div></div>`+
+    `<div class="sc"><div class="slbl">Remaining pcs</div><div class="sval">${Math.max(0,totalTarget-totalFilled).toLocaleString()}</div></div>`;
+}
+
+function renderOrders(){
+  const fc=(document.getElementById('ofc').value||'').trim().toLowerCase();
+  const fs=document.getElementById('ofs').value;
+  const list=ORDERS.filter(o=>
+    (!fs||o.status===fs)&&
+    (!fc||o.batchNo.toLowerCase().includes(fc)||(o.client||'').toLowerCase().includes(fc)));
+  if(!list.length){
+    document.getElementById('olist').innerHTML=`<div class="empty">${ORDERS.length===0?'No orders yet. Create one from "New order".':'No orders match this filter.'}</div>`;
+    return;
+  }
+  document.getElementById('olist').innerHTML=list.map(o=>{
+    const sc=(o.status||'Production').replace(/\s/g,'_');
+    const target=o.targetQty||0;
+    const filled=orderFill(o);
+    const remaining=target-filled;
+    const pct=target>0?Math.min(100,Math.round(filled/target*100)):0;
+    const done=remaining<=0&&target>0;
+    const remCls=done?'full':(remaining<0?'over':'rem');
+    const remTxt=target<=0?'No target set':done?(remaining<0?`Over by ${Math.abs(remaining).toLocaleString()} pcs`:'Complete — target met'):`${remaining.toLocaleString()} pcs remaining`;
+    const obs=orderBatches(o);
+    const byProd={};
+    obs.forEach(b=>{const k=b.product||'—';byProd[k]=(byProd[k]||0)+batchPcs(b);});
+    const prodKeys=Object.keys(byProd).sort((a,b)=>byProd[b]-byProd[a]);
+    const showBreak=obs.length>0&&(prodKeys.length>1||!o.product);
+    return`<div class="ocard">
+      <div class="omain">
+        <div class="otop">
+          <span class="ono">${o.batchNo}</span>
+          <span class="badge b-${sc}">${o.status||'Production'}</span>
+          ${o.product?`<span class="ometa">${o.product}</span>`:`<span class="ometa">Mixed products</span>`}
+          ${o.client?`<span class="ometa">${o.client}</span>`:''}
+          ${o.mfg?`<span class="ometa">Ordered ${o.mfg}</span>`:''}
+          <div class="oact">
+            <button class="btn btn-sm btn-primary" onclick="addBatchToOrder('${o.id}')">+ Add batch</button>
+            <a href="${o.pageUrl}" target="_blank" class="btn btn-sm">Notion ↗</a>
+            <button class="btn btn-sm" onclick="toggleOrderExp('${o.id}')">${o._exp?'▲':'▼'} ${obs.length} batch${obs.length!==1?'es':''}</button>
+            ${o._confirmDel?
+              `<button class="btn btn-sm btn-danger" onclick="deleteOrder('${o.id}','${o.batchNo}')">Confirm delete?</button>
+               <button class="btn btn-sm" onclick="cancelDelOrder('${o.id}')">Cancel</button>`
+              :`<button class="btn btn-sm btn-danger" onclick="askDelOrder('${o.id}')">Delete</button>`}
+          </div>
+        </div>
+        <div class="pbar"><div class="pfill${done?' done':''}" style="width:${pct}%"></div></div>
+        <div class="pnums">
+          <span><b>${filled.toLocaleString()}</b> / ${target.toLocaleString()} pcs &nbsp;(${pct}%)</span>
+          <span class="premain ${remCls}">${remTxt}</span>
+        </div>
+      </div>
+      ${o._exp?`<div class="obatches">
+        ${showBreak?`<div class="opbreak"><div class="opbttl">Produced by product</div>${prodKeys.map(p=>{
+          const v=byProd[p];const ppct=target>0?Math.round(v/target*100):0;
+          return`<div class="opbrow"><span class="opbname">${p}</span><span class="opbval">${v.toLocaleString()} pcs${target>0?` · ${ppct}% of order`:''}</span></div>`;
+        }).join('')}</div>`:''}
+        ${obs.length?obs.map(b=>{
+          const bsc=b.status.replace(/\s/g,'_');
+          const variant=b.size?(' — '+b.size):(b.color?(' — '+b.color):'');
+          return`<div class="obrow">
+            <span class="bno">${b.batchNo}</span>
+            <span class="badge b-${bsc}">${b.status}</span>
+            <span class="bmeta">${b.product}${variant}</span>
+            <span class="bmeta">${batchPcs(b).toLocaleString()} pcs</span>
+            <a href="${b.pageUrl}" target="_blank" class="btn btn-sm" style="margin-left:auto">Notion ↗</a>
+          </div>`;
+        }).join(''):`<div class="obnone">No batches in this order yet. Click "+ Add batch" to fill it.</div>`}
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function toggleOrderExp(id){const o=ORDERS.find(x=>x.id===id);if(o)o._exp=!o._exp;renderOrders();}
+function askDelOrder(id){ORDERS.forEach(o=>o._confirmDel=false);const o=ORDERS.find(x=>x.id===id);if(o)o._confirmDel=true;renderOrders();}
+function cancelDelOrder(id){const o=ORDERS.find(x=>x.id===id);if(o)o._confirmDel=false;renderOrders();}
+
+async function deleteOrder(pid,on){
+  const o=ORDERS.find(x=>x.id===pid);
+  const childCount=o?orderBatches(o).length:0;
+  toast(`Deleting order ${on}...`,'info');
+  try{
+    const r=await api('PATCH',`/pages/${pid}`,{archived:true});
+    if(r.object==='error'){toast('Error: '+r.message,'err');return;}
+    ORDERS=ORDERS.filter(x=>x.id!==pid);
+    renderOrderStats();renderOrders();populateOrderSelect();
+    toast(`Order ${on} deleted${childCount?` (its ${childCount} batch${childCount!==1?'es':''} kept)`:''}`,'ok');
+  }catch(e){toast('Error: '+e.message,'err');}
+}
+
+function prevOrder(){
+  const ono=genOrderNo(ORDERS&&ORDERS.length?ORDERS:BATCHES);
+  if(document.getElementById('ono'))document.getElementById('ono').value=ono;
+  const tq=parseInt(document.getElementById('otq').value)||0;
+  const prod=document.getElementById('op').value;
+  document.getElementById('opcode').textContent=ono;
+  document.getElementById('opdet').textContent=`Target ${tq.toLocaleString()} pcs${prod?' · '+prod:' · mixed products'} · fill with batches over time`;
+}
+
+async function createOrder(){
+  const ono=genOrderNo(ORDERS&&ORDERS.length?ORDERS:BATCHES);
+  const client=document.getElementById('ocl').value.trim();
+  const prod=document.getElementById('op').value;
+  const target=parseInt(document.getElementById('otq').value)||0;
+  const odt=document.getElementById('odt').value;
+  const odelivery=document.getElementById('odelivery')?document.getElementById('odelivery').value:'';
+  const status=document.getElementById('os').value;
+  const notes=document.getElementById('onn').value.trim();
+  if(ORDERS.some(o=>o.batchNo.toUpperCase()===ono.toUpperCase())){
+    toast(`Order ${ono} already exists`,'err');return;
+  }
+  const btn=document.getElementById('osavebtn');
+  btn.disabled=true;document.getElementById('osavemsg').textContent='Saving...';
+  try{
+    const props={
+      'Batch No.':{title:[{text:{content:ono}}]},
+      'Record Type':{select:{name:'Order'}},
+      'Status':{select:{name:status}},
+      'Target Qty':{number:target},
+    };
+    if(prod)props['Product']={select:{name:prod}};
+    if(client)props['Client / Destination']={rich_text:[{text:{content:client}}]};
+    if(odt)props['Order Start Date']={date:{start:odt}};
+    if(odelivery)props['Delivery Date']={date:{start:odelivery}};
+    if(notes)props['Notes']={rich_text:[{text:{content:notes}}]};
+    const r=await api('POST','/pages',{parent:{database_id:DBID},properties:props});
+    if(r.object==='error'){toast('Notion: '+r.message,'err');document.getElementById('osavemsg').textContent='';btn.disabled=false;return;}
+    ORDERS.unshift(parse(r));
+    renderOrderStats();renderOrders();populateOrderSelect();
+    document.getElementById('osavemsg').textContent='';
+    document.getElementById('ocl').value='';document.getElementById('onn').value='';
+    if(document.getElementById('odelivery'))document.getElementById('odelivery').value='';
+    prevOrder();
+    toast(`Order ${ono} created!`,'ok');
+    document.getElementById('newores').innerHTML=`<div class="rcard">
+      <div style="font-size:14px;font-weight:500;margin-bottom:10px;color:var(--navy)">Order created</div>
+      <div class="rrow"><span class="rl">Order no.</span><span class="rv" style="font-family:'IBM Plex Mono',monospace">${ono}</span></div>
+      <div class="rrow"><span class="rl">Target</span><span class="rv">${target.toLocaleString()} pcs</span></div>
+      ${prod?`<div class="rrow"><span class="rl">Product</span><span class="rv">${prod}</span></div>`:''}
+      ${client?`<div class="rrow"><span class="rl">Client</span><span class="rv">${client}</span></div>`:''}
+      ${odt?`<div class="rrow"><span class="rl">Start date</span><span class="rv">${odt}</span></div>`:''}
+      ${odelivery?`<div class="rrow"><span class="rl">Delivery date</span><span class="rv"><strong>${odelivery}</strong></span></div>`:''}
+      <div class="rrow"><span class="rl">Next</span><span class="rv">Go to “New batch” and pick this order, or click “+ Add batch” on the order</span></div>
+      <div class="rrow"><span class="rl">Notion</span><a href="${r.url||'#'}" target="_blank" class="rv">Open ↗</a></div>
+    </div>`;
+  }catch(e){toast('Error: '+e.message,'err');}
+  btn.disabled=false;
+}
+
+// Fill the "Part of order" dropdown on the New batch form
+function populateOrderSelect(){
+  const sel=document.getElementById('nord');
+  if(!sel)return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— Standalone batch (no order) —</option>';
+  ORDERS.forEach(o=>{
+    const filled=orderFill(o),target=o.targetQty||0,rem=target-filled;
+    const o2=document.createElement('option');
+    o2.value=o.batchNo;
+    o2.textContent=`${o.batchNo}${o.client?' · '+o.client:''} · ${rem>0?rem.toLocaleString()+' pcs left':'target met'}`;
+    sel.appendChild(o2);
+  });
+  if(cur)sel.value=cur;
+  onOrderPick();
+}
+
+function onOrderPick(){
+  const sel=document.getElementById('nord');
+  const info=document.getElementById('nord-info');
+  if(!sel){return;}
+  const o=ORDERS.find(x=>x.batchNo===sel.value);
+  if(!o){if(info)info.textContent='';return;}
+  // Prefill product + client from the order to save typing
+  if(o.product){
+    const np=document.getElementById('np');
+    if(np&&[...np.options].some(op=>op.value===o.product)){np.value=o.product;toggleVariantField();}
+  }
+  if(o.client){const ncl=document.getElementById('ncl');if(ncl&&!ncl.value.trim())ncl.value=o.client;}
+  prev();
+  const filled=orderFill(o),target=o.targetQty||0,rem=target-filled;
+  if(info)info.innerHTML=`Order target <b>${target.toLocaleString()}</b> pcs · produced ${filled.toLocaleString()} · `+
+    (rem>0?`<span style="color:var(--amber-fg)">${rem.toLocaleString()} pcs remaining</span>`:`<span style="color:var(--green-fg)">target met</span>`);
+}
+
+function addBatchToOrder(orderId){
+  const o=ORDERS.find(x=>x.id===orderId);
+  if(!o)return;
+  goPage('new',document.querySelectorAll('.nitem')[3]);
+  const sel=document.getElementById('nord');
+  if(sel)sel.value=o.batchNo;
+  onOrderPick();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── PRINT LABELS ──────────────────────────────────────────
+function populateBatchSelect(){
+  const sel=document.getElementById('lb-batch');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— choose a batch —</option>';
+  BATCHES.forEach(b=>{
+    const o=document.createElement('option');
+    o.value=b.id; o.textContent=b.batchNo+' — '+b.product;
+    sel.appendChild(o);
+  });
+  if(cur) sel.value=cur;
+}
+
+function buildLabelData(b, type){
+  const labels=[];
+  const isSize=!!SIZE_OPTIONS[b.product];
+  const variant = isSize ? (b.size||'—') : (b.color||'—');
+  const variantLbl = isSize ? 'SIZE' : 'CAP COLOUR';
+  if(type==='batch'){
+    labels.push({id:'b0',loc:b.batchNo,product:b.product,status:b.status,variant,variantLbl,
+      code:b.batchNo,mfg:b.mfg,exp:b.expiry,qty:`${(b.cartons*b.bagsPerCarton*b.pcsPerBag).toLocaleString()} pcs`,full:true});
+  } else if(type==='carton'){
+    for(let c=1;c<=parseInt(b.cartons);c++){
+      const cc=b.batchNo+'-C'+pad(c,2);
+      labels.push({id:'c'+c,loc:`Carton ${pad(c,2)} of ${b.cartons}`,product:b.product,status:b.status,variant,variantLbl,
+        code:cc,mfg:b.mfg,exp:b.expiry,qty:`${(b.bagsPerCarton*b.pcsPerBag).toLocaleString()} pcs`,full:true});
+    }
+  } else {
+    for(let c=1;c<=parseInt(b.cartons);c++){
+      for(let bg=1;bg<=parseInt(b.bagsPerCarton);bg++){
+        const bc=b.batchNo+'-C'+pad(c,2)+'-B'+pad(bg,2);
+        labels.push({id:'c'+c+'b'+bg,loc:`Carton ${pad(c,2)} - Bag ${pad(bg,2)}`,product:b.product,status:b.status,variant,variantLbl,
+          code:bc,mfg:b.mfg,exp:b.expiry,qty:`${(b.pcsPerBag||5000).toLocaleString()} pcs`,full:false});
+      }
+    }
+  }
+  return labels;
+}
+
+function labelTemplate(l, full){
+  // Matches the approved PDF design: black header band, field grid, barcode, footer
+  const footer = full ? `<div class="lf-foot">
+      <div>+20 100 208 9590  |  +20 111 005 5538  |  Factory: 02 3833 6566</div>
+      <div>neweastpharma@gmail.com  |  www.eastpharmaceutical.com</div>
+      <div>Plot 602, Industrial Zone, 6th of October City, Giza, Egypt</div>
+    </div>` : `<div class="lf-foot lf-foot-short">+20 100 208 9590  |  eastpharmaceutical.com</div>`;
+  return `<div class="eps-label ${full?'lbl-full':'lbl-bag'}">
+    <div class="lf-head">
+      <span>EAST PHARMACEUTICAL SERVICES</span>
+      <span class="lf-head-r">GMP &amp; ISO 9001:2015 CERTIFIED</span>
+    </div>
+    <div class="lf-product">${l.product}</div>
+    <div class="lf-grid">
+      <div><div class="lf-lbl">${full?'CARTON NO.':'LOCATION'}</div><div class="lf-val">${l.loc}</div></div>
+      <div><div class="lf-lbl">${l.variantLbl}</div><div class="lf-val">${l.variant}</div></div>
+      <div><div class="lf-lbl">SERIAL NO.</div><div class="lf-val">${l.code}</div></div>
+      <div><div class="lf-lbl">NET QTY</div><div class="lf-val">${l.qty}</div></div>
+      <div><div class="lf-lbl">MFG. DATE</div><div class="lf-val">${l.mfg||'—'}</div></div>
+      <div><div class="lf-lbl">EXP. DATE</div><div class="lf-val">${l.exp||'—'}</div></div>
+    </div>
+    <div class="lf-bcwrap">
+      <svg class="lf-bc" jsbarcode-value="${l.code}" jsbarcode-format="CODE128"
+           jsbarcode-displayvalue="false" jsbarcode-margin="0" jsbarcode-height="${full?34:24}"
+           jsbarcode-width="${full?1.6:1.3}"></svg>
+      <div class="lf-code">${l.code}</div>
+    </div>
+    ${footer}
+  </div>`;
+}
+
+const LABEL_CSS = `
+  .eps-label{background:#fff;border:1px dashed #999;border-radius:3px;padding:7px 9px;
+    font-family:Arial,Helvetica,sans-serif;color:#111;display:flex;flex-direction:column;
+    box-sizing:border-box;page-break-inside:avoid}
+  .lbl-full{width:190mm;height:52mm}
+  .lbl-bag{width:190mm;height:36mm;padding:5px 7px}
+  .lf-head{background:#000;color:#fff;display:flex;justify-content:space-between;align-items:center;
+    padding:3px 6px;font-weight:bold;font-size:9pt;letter-spacing:.03em}
+  .lbl-bag .lf-head{font-size:7pt;padding:2px 5px}
+  .lf-head-r{font-weight:normal;font-size:6.5pt}
+  .lbl-bag .lf-head-r{font-size:5.3pt}
+  .lf-product{font-weight:bold;font-size:10.5pt;margin:4px 0 3px}
+  .lbl-bag .lf-product{font-size:8pt;margin:3px 0 2px}
+  .lf-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px 10px;margin-bottom:3px}
+  .lf-lbl{font-size:6pt;color:#333}
+  .lbl-bag .lf-lbl{font-size:5pt}
+  .lf-val{font-weight:bold;font-size:7.5pt;margin-bottom:2px}
+  .lbl-bag .lf-val{font-size:6pt;margin-bottom:1px}
+  .lf-bcwrap{display:flex;flex-direction:column;align-items:flex-start;margin:2px 0}
+  .lf-bc{height:34px}
+  .lbl-bag .lf-bc{height:24px}
+  .lf-code{font-family:'Courier New',monospace;font-size:6.5pt;margin-top:1px}
+  .lbl-bag .lf-code{font-size:5.3pt}
+  .lf-foot{font-size:5.3pt;color:#444;margin-top:auto;line-height:1.4}
+  .lf-foot-short{font-size:5.3pt}
+`;
+
+function previewLabels(){
+  const bid=document.getElementById('lb-batch').value;
+  const type=document.getElementById('lb-type').value;
+  if(!bid){document.getElementById('lb-preview').innerHTML='';document.getElementById('lb-count').textContent='';return;}
+  const b=BATCHES.find(x=>x.id===bid);
+  if(!b)return;
+  const labels=buildLabelData(b,type);
+  document.getElementById('lb-count').textContent=labels.length+' label'+(labels.length!==1?'s':'');
+  if(!document.getElementById('eps-label-css')){
+    const st=document.createElement('style');st.id='eps-label-css';st.textContent=LABEL_CSS+`
+      #lb-preview .eps-label{width:100%!important;max-width:480px;height:auto!important}
+      #lb-preview .lf-bc{width:100%;height:auto}`;
+    document.head.appendChild(st);
+  }
+  const full = type!=='bag';
+  document.getElementById('lb-preview').innerHTML=
+    `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px">${
+      labels.map(l=>labelTemplate(l,full)).join('')
+    }</div>`;
+  renderAllBarcodes(document.getElementById('lb-preview'));
+}
+
+function renderAllBarcodes(root){
+  if(typeof JsBarcode==='undefined'){
+    // Library not loaded yet — retry shortly
+    setTimeout(()=>renderAllBarcodes(root),300);
+    return;
+  }
+  root.querySelectorAll('svg.lf-bc').forEach(svg=>{
+    try{
+      JsBarcode(svg, svg.getAttribute('jsbarcode-value'), {
+        format:'CODE128',
+        displayValue:false,
+        margin:0,
+        height:parseInt(svg.getAttribute('jsbarcode-height'))||30,
+        width:parseFloat(svg.getAttribute('jsbarcode-width'))||1.5,
+        lineColor:'#000000',
+        background:'#ffffff'
+      });
+    }catch(e){console.error('Barcode render failed for',svg.getAttribute('jsbarcode-value'),e);}
+  });
+}
+
+function printLabels(){
+  const bid=document.getElementById('lb-batch').value;
+  if(!bid){toast('Please select a batch first','err');return;}
+  const b=BATCHES.find(x=>x.id===bid);
+  const type=document.getElementById('lb-type').value;
+  const labels=buildLabelData(b,type);
+  const full = type!=='bag';
+  const perPage = full ? 5 : 7;
+  const gap = full ? '4mm' : '2.5mm';
+  // Chunk labels into exact pages so print AND PDF download match (5 or 7 per page)
+  const pages=[];
+  for(let i=0;i<labels.length;i+=perPage) pages.push(labels.slice(i,i+perPage));
+  const pagesHtml = pages.map((pg,idx)=>
+    `<div class="pdf-page"${idx<pages.length-1?' style="page-break-after:always"':''}>${
+      pg.map(l=>labelTemplate(l,full)).join('')
+    }</div>`
+  ).join('');
+  const safeName = (b.batchNo+'_'+type).replace(/[^a-zA-Z0-9_-]/g,'_');
+  const win=window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>EPS Labels — ${b.batchNo}</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
+  <style>
+    @page{size:A4;margin:8mm}
+    body{margin:0;background:#f0f0f0;font-family:Arial}
+    .toolbar{padding:14px;display:flex;gap:10px;align-items:center;background:#fff;border-bottom:1px solid #ddd}
+    .toolbar button{padding:8px 18px;color:white;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:Arial}
+    .btn-print{background:#0D2B4E}
+    .btn-dl{background:#2E86C1}
+    .btn-dl:disabled{background:#9DB8C9;cursor:wait}
+    .pdf-page{padding:8mm;display:flex;flex-direction:column;gap:${gap};align-items:center}
+    ${LABEL_CSS}
+    .eps-label{page-break-inside:avoid;break-inside:avoid}
+    @media print{
+      .toolbar{display:none}
+      .pdf-page{padding:0}
+      .eps-label{border-style:dashed}
+    }
+  </style></head><body>
+  <div class="toolbar no-print">
+    <button class="btn-print" onclick="window.print()">Print</button>
+    <button class="btn-dl" id="dlBtn" onclick="downloadPDF()">Download PDF</button>
+    <span style="font-size:12px;color:#666">${labels.length} labels · ${b.batchNo} · ${perPage} per page · ${pages.length} page${pages.length!==1?'s':''}</span>
+  </div>
+  <div id="pdfRoot">${pagesHtml}</div>
+  <script>
+    let barcodesReady=false;
+    function renderBarcodes(){
+      if(typeof JsBarcode==='undefined'){setTimeout(renderBarcodes,200);return;}
+      document.querySelectorAll('svg.lf-bc').forEach(function(svg){
+        JsBarcode(svg, svg.getAttribute('jsbarcode-value'), {
+          format:'CODE128', displayValue:false, margin:0,
+          height: parseInt(svg.getAttribute('jsbarcode-height'))||30,
+          width: parseFloat(svg.getAttribute('jsbarcode-width'))||1.5,
+          lineColor:'#000000', background:'#ffffff'
+        });
+      });
+      barcodesReady=true;
+    }
+    window.addEventListener('load',renderBarcodes);
+
+    function downloadPDF(){
+      const btn=document.getElementById('dlBtn');
+      if(!barcodesReady){ setTimeout(downloadPDF,200); return; }
+      btn.disabled=true; btn.textContent='Generating...';
+      const opt={
+        margin:0,
+        filename:'EPS_Labels_${safeName}.pdf',
+        image:{type:'jpeg',quality:0.98},
+        html2canvas:{scale:2,useCORS:true},
+        jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+        pagebreak:{mode:['css']}
+      };
+      html2pdf().from(document.getElementById('pdfRoot')).set(opt).save().then(function(){
+        btn.disabled=false; btn.textContent='Download PDF';
+      }).catch(function(e){
+        btn.disabled=false; btn.textContent='Download PDF';
+        alert('PDF generation failed: '+e.message);
+      });
+    }
+  <\/script>
+  </body></html>`);
+  win.document.close();
+}
+
+loadCfg();
+</script>
+</body>
+</html>
